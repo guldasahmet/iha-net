@@ -63,7 +63,7 @@
 ---
 
 ### Admin Paneli
-![Admin Panel](assets/admin_screenshot.png)
+![Admin Panel](assets/admin_paneli.jpeg)
 *Kullanıcı yönetimi, sistem istatistikleri ve rol atama*
 
 ---
