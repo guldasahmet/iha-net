@@ -1,0 +1,14 @@
+Flask==2.3.3
+Flask-SQLAlchemy
+SQLAlchemy
+Flask-Login
+Werkzeug
+scikit-learn
+joblib
+Flask-SocketIO
+python-socketio
+eventlet
+dronekit
+requests
+numpy
+PyQt5

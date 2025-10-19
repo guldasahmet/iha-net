@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFAD Acil Yardım Talep Formu</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+            padding: 20px 0;
+        }
+
+        .container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            border: 3px solid #dc2626;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo {
+            width: 70px;
+            height: 70px;
+            background: #dc2626;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+        }
+
+        .logo-text {
+            color: white;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 8px;
+            line-height: 1.2;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        textarea, input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 15px;
+            min-height: 48px;
+            resize: vertical;
+            font-family: inherit;
+            background: #f9fafb;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        textarea {
+            min-height: 80px;
+            max-height: 120px;
+        }
+
+        textarea:focus, input:focus, select:focus {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+            background: white;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 10px 30px rgba(220, 38, 38, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .submit-btn:hover::before {
+            left: 100%;
+        }
+
+        .submit-btn:hover {
+            background: linear-gradient(135deg, #991b1b, #7f1d1d);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(220, 38, 38, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 10px 30px rgba(220, 38, 38, 0.3);
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+            border: 2px solid #bbf7d0;
+        }
+
+        .status-error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 2px solid #fecaca;
+        }
+
+        .status-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #bfdbfe;
+        }
+
+        .loading-animation {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Harita stili */
+        #map {
+            height: 200px;
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 8px;
+            border: 2px solid #e5e7eb;
+            transition: border-color 0.3s ease;
+        }
+
+        #map:hover {
+            border-color: #dc2626;
+        }
+
+        small {
+            display: block;
+            margin-top: 6px;
+            color: #6b7280;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .footer {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+        }
+
+        .footer-text {
+            color: #9ca3af;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 28px 20px;
+                margin: 16px;
+            }
+
+            .header {
+                margin-bottom: 24px;
+            }
+
+            .logo {
+                width: 60px;
+                height: 60px;
+                margin-bottom: 16px;
+            }
+
+            .logo-text {
+                font-size: 24px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .header p {
+                font-size: 13px;
+            }
+
+            .form-group {
+                margin-bottom: 18px;
+            }
+
+            textarea {
+                min-height: 70px;
+                max-height: 100px;
+            }
+
+            .submit-btn {
+                font-size: 16px;
+                padding: 14px 18px;
+            }
+
+            #map {
+                height: 180px;
+            }
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { 
+                box-shadow: 0 10px 30px rgba(220, 38, 38, 0.3);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 15px 40px rgba(220, 38, 38, 0.5);
+                transform: scale(1.02);
+            }
+        }
+
+        #emergencyBtn:hover {
+            background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+            animation: none;
+        }
+
+        #emergencyBtn:disabled {
+            animation: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span class="logo-text">🆘</span>
+            </div>
+            <h1>AFAD Acil Yardım Talebi</h1>
+            <p>Durumunuzu kısaca açıklayın ve konumunuzu işaretleyin</p>
+        </div>
+        
+        <form id="yardimForm">
+            <div class="form-group">
+                <label for="not">Durumunuzu Açıklayın: *</label>
+                <textarea id="not" name="not" placeholder="Örnek: 3. katta mahsur kaldık, 4 kişiyiz, yaralımız yok"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="konum_secimi">Konumunuzu İşaretleyin:</label>
+                <div id="map"></div>
+                <small>Harita üzerinde bulunduğunuz yeri tıklayarak işaretleyebilirsiniz</small>
+                
+                <input type="hidden" id="selectedLat" name="lat">
+                <input type="hidden" id="selectedLng" name="lng">
+            </div>
+            
+            <div class="status-message status-info" id="locationMessage" style="display: none;">Konumunuz alınıyor...</div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                🚨 Gönder
+            </button>
+        </form>
+        
+        <div class="status-message" id="depremzedeStatusMessage"></div>
+
+        <!-- Acil Yardım Butonu -->
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid #fecaca;">
+            <div style="text-align: center; margin-bottom: 16px;">
+                <h3 style="color: #dc2626; font-size: 18px; font-weight: 700; margin-bottom: 8px;">⚡ Acil Durum</h3>
+                <p style="color: #6b7280; font-size: 13px; line-height: 1.4;">Konumunuzu belirleyemiyorsanız veya acil durumdaysanız bu butona basın</p>
+            </div>
+            <button type="button" class="submit-btn" id="emergencyBtn" style="background: linear-gradient(135deg, #ef4444, #dc2626); animation: pulse-red 2s infinite;">
+                ⚡ ACİL!!
+            </button>
+        </div>
+
+        <div class="footer">
+            <p class="footer-text">T.C. İçişleri Bakanlığı AFAD</p>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let currentMarker;
+        // Bursa'nın merkez koordinatları
+        const defaultLat = 40.1885;
+        const defaultLng = 29.0609;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const locationMessage = document.getElementById('locationMessage');
+            const selectedLatInput = document.getElementById('selectedLat');
+            const selectedLngInput = document.getElementById('selectedLng');
+
+            locationMessage.style.display = 'block'; // Mesajı göster
+
+            // Haritayı başlat
+            map = L.map('map').setView([defaultLat, defaultLng], 13); // Varsayılan olarak Bursa merkez
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap katkıları'
+            }).addTo(map);
+
+            // Haritaya tıklama olayını ekle
+            map.on('click', function(e) {
+                if (currentMarker) {
+                    map.removeLayer(currentMarker);
+                }
+                currentMarker = L.marker(e.latlng).addTo(map);
+                selectedLatInput.value = e.latlng.lat.toFixed(6);
+                selectedLngInput.value = e.latlng.lng.toFixed(6);
+                showStatus(`✅ Konumunuz haritada işaretlendi`, 'success');
+            });
+
+            // Kullanıcının otomatik konumunu al
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLng = position.coords.longitude;
+
+                        map.setView([userLat, userLng], 16); // Haritayı kullanıcının konumuna odakla
+                        if (currentMarker) {
+                            map.removeLayer(currentMarker);
+                        }
+                        currentMarker = L.marker([userLat, userLng]).addTo(map); // Markeri kullanıcının konumuna yerleştir
+                        selectedLatInput.value = userLat.toFixed(6);
+                        selectedLngInput.value = userLng.toFixed(6);
+                        showStatus('✅ Konumunuz otomatik olarak alındı', 'success');
+                        locationMessage.style.display = 'none';
+                    },
+                    (error) => {
+                        console.error("Konum alınamadı:", error);
+                        let errorMessage = '❌ Konumunuz otomatik alınamadı. Lütfen haritada bulunduğunuz yeri işaretleyiniz.';
+                        if (error.code === error.PERMISSION_DENIED) {
+                            errorMessage = '❌ Konum erişimine izin vermediğiniz için konumunuz otomatik alınamadı.';
+                        } else if (error.code === error.TIMEOUT) {
+                            errorMessage = '❌ Konum alma işlemi zaman aşımına uğradı.';
+                        }
+                        showStatus(errorMessage, 'error');
+                        locationMessage.style.display = 'none';
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                showStatus('❌ Tarayıcınız konum servislerini desteklemiyor. Lütfen haritada bulunduğunuz yeri işaretleyiniz.', 'error');
+                locationMessage.style.display = 'none';
+            }
+        });
+
+        function showStatus(message, type) {
+            const statusMessage = document.getElementById('depremzedeStatusMessage');
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message status-' + type;
+            statusMessage.style.display = 'block';
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusMessage.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        document.getElementById('yardimForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const not = document.getElementById('not').value.trim();
+            const selectedLat = document.getElementById('selectedLat').value;
+            const selectedLng = document.getElementById('selectedLng').value;
+            
+            const statusMessage = document.getElementById('depremzedeStatusMessage');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            if (!not) {
+                showStatus('Lütfen durumunuzu açıklayın.', 'error');
+                return;
+            }
+
+            if (!selectedLat || !selectedLng) {
+                showStatus('Lütfen harita üzerinden konumunuzu işaretleyiniz.', 'error');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading-animation">📡</span> Gönderiliyor...';
+            showStatus('Yardım çağrınız iletiliyor...', 'info');
+            
+            try {
+                const response = await fetch('/api/yardim_talebi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        not: not,
+                        lat: parseFloat(selectedLat),
+                        lng: parseFloat(selectedLng),
+                        adres: `İşaretlenen Konum: ${selectedLat}, ${selectedLng}`
+                    })
+                });
+                
+                const result = await response.json();
+
+                if (result.success) {
+                    // Takip numarasını içeren mesajı göster
+                    showStatus(`✅ Talebiniz kaydedildi! Takip Numaranız: ${result.request_id}. Arama kurtarma ekipleri bilgilendirildi.`, 'success');
+                    document.getElementById('not').value = ''; // Not alanını temizle
+
+                } else {
+                    showStatus('❌ ' + result.message, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Sunucuya ulaşılamıyor veya bir hata oluştu. Lütfen internet bağlantınızı kontrol edin veya 112\'yi arayın.', 'error');
+                console.error('Fetch error:', error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '🚨 Acil Yardım Çağır';
+            }
+        });
+
+        // Acil yardım butonu için event listener
+        document.getElementById('emergencyBtn').addEventListener('click', async function() {
+            const emergencyBtn = document.getElementById('emergencyBtn');
+            const originalText = emergencyBtn.innerHTML;
+            
+            emergencyBtn.disabled = true;
+            emergencyBtn.innerHTML = '<span class="loading-animation">📡</span> ACİL ÇAĞRI GÖNDERİLİYOR...';
+            showStatus('Acil yardım çağrınız iletiliyor...', 'info');
+            
+            try {
+                // Bursa merkez koordinatları - kapsama alanı içinde varsayılan konum
+                const defaultLat = 40.1885;
+                const defaultLng = 29.0609;
+                
+                const response = await fetch('/api/yardim_talebi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        not: 'ACİL YARDIM ÇAĞRISI - Konumu bilinmeyen acil durum talebi',
+                        lat: defaultLat,
+                        lng: defaultLng,
+                        adres: 'Konum Bilinmiyor - Acil Yardım Talebi (Kapsama Alanı: Bursa)'
+                    })
+                });
+                
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus(`🚨 ACİL YARDIM ÇAĞRINIZ KAYDEDİLDİ! Takip Numaranız: ${result.request_id}. Arama kurtarma ekipleri acil olarak bilgilendirildi.`, 'success');
+                } else {
+                    showStatus('❌ ' + result.message, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Acil yardım çağrısı gönderilemedi. Lütfen 112\'yi arayın!', 'error');
+                console.error('Emergency call error:', error);
+            } finally {
+                emergencyBtn.disabled = false;
+                emergencyBtn.innerHTML = originalText;
+            }
+        });
+    </script>
+</body>
+</html>

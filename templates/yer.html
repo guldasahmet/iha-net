@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Lodos TELEMETRİ SİSTEMİ</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <style>
+        /* ...stil kodların aynı şekilde bırakıldı... */
+        body { margin: 0; background: #121F2B; color: #E1E9F0; font-family: 'Segoe UI', Arial, sans-serif; }
+        .container { display: flex; flex-direction: row; height: 100vh; width: 100vw; }
+        .left-panel { flex: 2.5; display: flex; flex-direction: column; padding: 0; position: relative; }
+        #map { flex: 1; min-height: 500px; min-width: 900px; height: 100%; }
+        .right-panel { flex: 1; background: #19202A; display: flex; flex-direction: column; align-items: center; padding: 20px 10px 10px 10px; min-width: 400px; }
+        .connection-status { background: #dc2626; color: white; padding: 8px 16px; border-radius: 4px; margin-bottom: 16px; font-size: 14px; font-weight: bold; }
+        .connection-status.connected { background: #059669; }
+        .gauges { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+        .gauge { width: 120px; height: 120px; background: #222; border-radius: 50%; margin: 5px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
+        .gauge.updating { box-shadow: 0 0 20px rgba(52, 152, 219, 0.5); }
+        .telemetry-panel, .console-panel { background: #1F2937; color: #E1E9F0; border-radius: 8px; padding: 16px; margin-top: 16px; width: 95%; font-size: 16px; min-height: 80px; }
+        .console-panel { min-height: 120px; font-size: 15px; overflow-y: auto; max-height: 200px; }
+        .data-field { margin: 4px 0; padding: 2px 0; }
+        .data-label { color: #9CA3AF; font-weight: 500; }
+        .data-value { color: #F3F4F6; font-weight: bold; }
+        
+        .control-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(31, 41, 55, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(75, 85, 99, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .control-button {
+            display: block;
+            width: 100%;
+            margin-bottom: 8px;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+        }
+        
+        .control-button:last-child {
+            margin-bottom: 0;
+        }
+        
+        .control-button.goto {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            box-shadow: 0 3px 12px rgba(40, 167, 69, 0.4);
+        }
+        
+        .control-button.goto:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 16px rgba(40, 167, 69, 0.6);
+        }
+        
+        .control-button.home {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 3px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .control-button.home:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 16px rgba(102, 126, 234, 0.6);
+        }
+        
+        .control-button.rtl {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            box-shadow: 0 3px 12px rgba(231, 76, 60, 0.4);
+        }
+        
+        .control-button.rtl:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 16px rgba(231, 76, 60, 0.6);
+        }
+        
+        .control-button.deploy {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            box-shadow: 0 3px 12px rgba(243, 156, 18, 0.4);
+        }
+        
+        .control-button.deploy:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 16px rgba(243, 156, 18, 0.6);
+        }
+        
+        .control-button.track {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+            box-shadow: 0 3px 12px rgba(155, 89, 182, 0.4);
+        }
+        
+        .control-button.track:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 16px rgba(155, 89, 182, 0.6);
+        }
+        
+        .control-button.track.active {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            box-shadow: 0 3px 12px rgba(39, 174, 96, 0.4);
+        }
+        
+        .control-button:active {
+            transform: translateY(0);
+        }
+        
+        .control-button:disabled {
+            background: #6B7280;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+    </style>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="left-panel">
+        <div class="control-panel">
+            <button id="goto-location-btn" class="control-button goto">📍 Konuma Git</button>
+            <button id="track-btn" class="control-button track">🎯 Takip Et</button>
+            <button id="set-home-btn" class="control-button home">🏠 Tıklanan Noktaya Git</button>
+            <button id="deploy-btn" class="control-button deploy">🕸️ Ağ Yay</button>
+            <button id="rtl-btn" class="control-button rtl">🏠 Base'e Dön</button>
+        </div>
+        <div id="map"></div>
+    </div>
+    <div class="right-panel">
+        <div class="connection-status" id="connection-status">
+            Mission Planner: BAĞLANTI BEKLENİYOR
+        </div>
+        
+        <div class="gauges">
+            <!-- ...gauge kodların aynı şekilde bırakıldı... -->
+            <div class="gauge" style="background: radial-gradient(circle, #2C3E50 0%, #34495E 100%); border: 3px solid #3498DB;">
+                <div style="text-align: center; color: #ECF0F1;">
+                    <div style="font-size: 12px; margin-bottom: 5px;">HAVA HIZI</div>
+                    <div style="font-size: 18px; font-weight: bold;" id="airspeed-value">0.00</div>
+                    <div style="font-size: 10px;">km/h</div>
+                </div>
+            </div>
+            <div class="gauge" style="background: radial-gradient(circle, #2C3E50 0%, #34495E 100%); border: 3px solid #E74C3C;">
+                <div style="text-align: center; color: #ECF0F1;">
+                    <div style="font-size: 12px; margin-bottom: 5px;">İRTİFA</div>
+                    <div style="font-size: 18px, font-weight: bold;" id="altitude-value">0.00</div>
+                    <div style="font-size: 10px;">m</div>
+                </div>
+            </div>
+            <div class="gauge" style="background: radial-gradient(circle, #2C3E50 0%, #34495E 100%); border: 3px solid #F39C12;">
+                <div style="text-align: center; color: #ECF0F1;">
+                    <div style="font-size: 12px; margin-bottom: 5px;">YER HIZI</div>
+                    <div style="font-size: 18px, font-weight: bold;" id="groundspeed-value">0.00</div>
+                    <div style="font-size: 10px;">km/h</div>
+                </div>
+            </div>
+            <div class="gauge" style="background: radial-gradient(circle, #2C3E50 0%, #34495E 100%); border: 3px solid #9B59B6;">
+                <div style="text-align: center; color: #ECF0F1;">
+                    <div style="font-size: 12px; margin-bottom: 5px;">YAW</div>
+                    <div style="font-size: 18px, font-weight: bold;" id="yaw-value">0.00°</div>
+                </div>
+            </div>
+            <div class="gauge" style="background: radial-gradient(circle, #2C3E50 0%, #34495E 100%); border: 3px solid #1ABC9C;">
+                <div style="text-align: center; color: #ECF0F1;">
+                    <div style="font-size: 12px; margin-bottom: 5px;">PITCH</div>
+                    <div style="font-size: 18px, font-weight: bold;" id="pitch-value">0.00°</div>
+                </div>
+            </div>
+            <div class="gauge" style="background: radial-gradient(circle, #2C3E50 0%, #34495E 100%); border: 3px solid #E67E22;">
+                <div style="text-align: center; color: #ECF0F1;">
+                    <div style="font-size: 12px; margin-bottom: 5px;">ROLL</div>
+                    <div style="font-size: 18px, font-weight: bold;" id="roll-value">0.00°</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="telemetry-panel" id="telemetry-panel">
+            <div class="data-field">
+                <span class="data-label">Uçuş Modu:</span> 
+                <span class="data-value" id="telemetry-flightmode" style="color: #F39C12; font-weight: bold;">UNKNOWN</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Air Speed:</span> 
+                <span class="data-value" id="telemetry-airspeed">0.00 km/h</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Altitude:</span> 
+                <span class="data-value" id="telemetry-altitude">0.00 m</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Ground Speed:</span> 
+                <span class="data-value" id="telemetry-groundspeed">0.00 km/h</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Lat:</span> 
+                <span class="data-value" id="telemetry-lat">0.000000</span> | 
+                <span class="data-label">Lon:</span> 
+                <span class="data-value" id="telemetry-lon">0.000000</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Yaw:</span> 
+                <span class="data-value" id="telemetry-yaw">0.00°</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Pitch:</span> 
+                <span class="data-value" id="telemetry-pitch">0.00°</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Roll:</span> 
+                <span class="data-value" id="telemetry-roll">0.00°</span>
+            </div>
+            <div class="data-field">
+                <span class="data-label">Sinyal Kalitesi:</span> 
+                <span class="data-value" id="telemetry-signal">0</span> | 
+                <span class="data-label">Batarya:</span> 
+                <span class="data-value" id="telemetry-battery">0%</span>
+            </div>
+        </div>
+        
+        <div class="console-panel" id="console-panel">
+            <div>&gt; Telemetri sistemi başlatılıyor...</div>
+            <div>&gt; Mission Planner bağlantısı bekleniyor...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global değişkenler
+    let map;
+    let aircraftMarker = null;
+    let isTracking = false; // Takip modu
+    let telemetryData = {
+        airspeed: 0,
+        altitude: 0,
+        groundspeed: 0,
+        latitude: 40.2376335,
+        longitude: 29.0081634,
+        yaw: 0,
+        pitch: 0,
+        roll: 0,
+        signalQuality: 0,
+        battery: 0,
+        flight_mode: "UNKNOWN",
+        koordinatlar: [] // <-- Python'dan gelen koordinatlar dizisi
+    };
+    let websocket;
+    let reconnectInterval;
+    let httpPollingInterval;
+    let positionMarkers = []; // Nokta markerları
+    let waypointMarkers = []; // Waypoint markerları
+    let waypointLine = null; // Waypoint çizgisi
+    let lastClickedCoord = null;
+
+    // Harita başlatma
+    function initializeMap() {
+        map = L.map('map').setView([telemetryData.latitude, telemetryData.longitude], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Sadece bir uçak işaretçisi (img ile)
+        const aircraftIcon = L.divIcon({
+            html: `<img src="http://localhost:8000/enemy.png" style="width:30px;height:30px;transform:rotate(${Number(telemetryData.yaw.toFixed(2))}deg);" />`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+            className: ""
+        });
+        aircraftMarker = L.marker([telemetryData.latitude, telemetryData.longitude], {icon: aircraftIcon}).addTo(map);
+
+        // Konum işaretçileri başta boş
+        positionMarkers = [];
+
+        // Haritaya tıklayınca koordinat gönder
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lon = e.latlng.lng;
+            lastClickedCoord = {lat, lon}; // Son tıklananı sakla
+
+            // Noktayı anlık göster (isteğe bağlı)
+            L.marker([lat, lon], {
+                icon: L.divIcon({
+                    html: `<div style="width:12px;height:12px;background:blue;border-radius:50%;border:2px solid white;"></div>`,
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6],
+                    className: ""
+                })
+            }).addTo(map);
+
+            // Sadece koordinat ekle (set_home olmadan)
+            fetch('http://localhost:8001/api/koordinat_ekle', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({lat: lat, lon: lon})
+            })
+            .then(res => res.json())
+            .then(data => addConsoleMessage('Koordinat eklendi: ' + JSON.stringify(data)))
+            .catch(err => addConsoleMessage('Koordinat ekleme hatası: ' + err));
+        });
+
+        // Home butonu
+        document.getElementById('set-home-btn').onclick = function() {
+            if (!lastClickedCoord) {
+                addConsoleMessage('Önce haritadan bir nokta seçin.');
+                return;
+            }
+            fetch('http://localhost:8001/api/koordinat_ekle', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({lat: lastClickedCoord.lat, lon: lastClickedCoord.lon, set_home: true})
+            })
+            .then(res => res.json())
+            .then(data => addConsoleMessage('Home ayarlandı, GUIDED modda hedefe gidiyor...'))
+            .catch(err => addConsoleMessage('Home noktası ayarlanamadı: ' + err));
+        };
+        
+        // Konuma git butonu
+        document.getElementById('goto-location-btn').onclick = function() {
+            if (telemetryData.latitude && telemetryData.longitude) {
+                map.setView([telemetryData.latitude, telemetryData.longitude], 16);
+                addConsoleMessage('Uçağın konumuna gidildi');
+            } else {
+                addConsoleMessage('Uçak konumu bulunamadı');
+            }
+        };
+        
+        // RTL butonu
+        document.getElementById('rtl-btn').onclick = function() {
+            fetch('http://localhost:8001/api/koordinat_ekle', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({rtl: true})
+            })
+            .then(res => res.json())
+            .then(data => addConsoleMessage('Manuel RTL komutu gönderildi'))
+            .catch(err => addConsoleMessage('RTL komutu gönderilemedi: ' + err));
+        };
+        
+        // Ağ yay butonu
+        document.getElementById('deploy-btn').onclick = function() {
+            fetch('http://localhost:8001/api/ag_yay', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({})
+            })
+            .then(res => res.json())
+            .then(data => addConsoleMessage('Ağ yayma komutu gönderildi'))
+            .catch(err => addConsoleMessage('Ağ yayma komutu gönderilemedi: ' + err));
+        };
+        
+        // Takip butonu
+        document.getElementById('track-btn').onclick = function() {
+            isTracking = !isTracking;
+            const trackBtn = document.getElementById('track-btn');
+            
+            if (isTracking) {
+                trackBtn.classList.add('active');
+                trackBtn.textContent = '🎯 Takip Aktif';
+                addConsoleMessage('Uçak takip modu aktif');
+                // Hemen uçağın konumuna git
+                if (telemetryData.latitude && telemetryData.longitude) {
+                    map.setView([telemetryData.latitude, telemetryData.longitude], map.getZoom());
+                }
+            } else {
+                trackBtn.classList.remove('active');
+                trackBtn.textContent = '🎯 Takip Et';
+                addConsoleMessage('Uçak takip modu pasif');
+            }
+        };
+    }
+
+    // WebSocket bağlantısı
+    function connectToMissionPlanner() {
+        try {
+            websocket = new WebSocket('ws://localhost:8080/telemetry');
+
+            websocket.onopen = function(event) {
+                updateConnectionStatus(true);
+                addConsoleMessage('Mission Planner bağlantısı başarılı');
+                clearInterval(reconnectInterval);
+                // HTTP polling'i durdurmak yerine başlat:
+                if (!httpPollingInterval) {
+                    httpPollingInterval = setInterval(fetchTelemetryHTTP, 1000);
+                }
+            };
+
+            websocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateTelemetryData(data); // Her yeni veri geldiğinde arayüz güncellenir
+                } catch (e) {
+                    console.error('Telemetri verisi parse hatası:', e);
+                }
+            };
+
+            websocket.onclose = function(event) {
+                updateConnectionStatus(false);
+                addConsoleMessage('Mission Planner bağlantısı kesildi');
+                scheduleReconnect();
+                // WebSocket kapandıysa HTTP polling başlat
+                if (!httpPollingInterval) {
+                    httpPollingInterval = setInterval(fetchTelemetryHTTP, 1000);
+                }
+            };
+
+            websocket.onerror = function(error) {
+                updateConnectionStatus(false);
+                addConsoleMessage('Bağlantı hatası: ' + error.message);
+                // Hata durumunda HTTP polling başlat
+                if (!httpPollingInterval) {
+                    httpPollingInterval = setInterval(fetchTelemetryHTTP, 1000);
+                }
+            };
+
+        } catch (error) {
+            updateConnectionStatus(false);
+            addConsoleMessage('WebSocket bağlantı hatası');
+            scheduleReconnect();
+            // Bağlantı hatasında HTTP polling başlat
+            if (!httpPollingInterval) {
+                httpPollingInterval = setInterval(fetchTelemetryHTTP, 1000);
+            }
+        }
+    }
+
+    // HTTP API ile veri çekme (alternatif)
+    function fetchTelemetryHTTP() {
+        fetch('/api/telemetry')
+            .then(response => response.json())
+            .then(data => updateTelemetryData(data))
+            .catch(error => {
+                console.error('HTTP telemetri hatası:', error);
+                addConsoleMessage('HTTP API hatası: ' + error.message);
+            });
+    }
+
+    // Telemetri verilerini güncelleme
+    function updateTelemetryData(data) {
+        // Veri güncellemesi
+        telemetryData = { ...telemetryData, ...data };
+
+        // Bağlantı durumunu güncel veri geldikçe BAĞLI yap
+        updateConnectionStatus(true);
+
+        // Gauge değerlerini güncelle
+        updateGauges();
+        
+        // Telemetri panelini güncelle
+        updateTelemetryPanel();
+        
+        // Haritada uçak pozisyonunu güncelle
+        updateAircraftPosition();
+        
+        // Gauge animasyonu
+        animateGauges();
+    }
+
+    // Gauge değerlerini güncelleme
+    function updateGauges() {
+        document.getElementById('airspeed-value').textContent = telemetryData.airspeed.toFixed(2);
+        document.getElementById('altitude-value').textContent = telemetryData.altitude.toFixed(2);
+        document.getElementById('groundspeed-value').textContent = telemetryData.groundspeed.toFixed(2);
+        document.getElementById('yaw-value').textContent = telemetryData.yaw.toFixed(2) + '°';
+        document.getElementById('pitch-value').textContent = telemetryData.pitch.toFixed(2) + '°';
+        document.getElementById('roll-value').textContent = telemetryData.roll.toFixed(2) + '°';
+    }
+
+    // Telemetri panelini güncelleme
+    function updateTelemetryPanel() {
+        document.getElementById('telemetry-flightmode').textContent = telemetryData.flight_mode || 'UNKNOWN';
+        document.getElementById('telemetry-airspeed').textContent = telemetryData.airspeed.toFixed(2) + ' km/h';
+        document.getElementById('telemetry-altitude').textContent = telemetryData.altitude.toFixed(2) + ' m';
+        document.getElementById('telemetry-groundspeed').textContent = telemetryData.groundspeed.toFixed(2) + ' km/h';
+        document.getElementById('telemetry-lat').textContent = telemetryData.latitude.toFixed(7);
+        document.getElementById('telemetry-lon').textContent = telemetryData.longitude.toFixed(7);
+        document.getElementById('telemetry-yaw').textContent = telemetryData.yaw.toFixed(2) + '°';
+        document.getElementById('telemetry-pitch').textContent = telemetryData.pitch.toFixed(2) + '°';
+        document.getElementById('telemetry-roll').textContent = telemetryData.roll.toFixed(2) + '°';
+        document.getElementById('telemetry-signal').textContent = telemetryData.signalQuality;
+        document.getElementById('telemetry-battery').textContent = telemetryData.battery + '%';
+
+    }
+
+    // Uçak pozisyonunu güncelleme
+    function updateAircraftPosition() {
+        if (aircraftMarker && telemetryData.latitude && telemetryData.longitude) {
+            const newLatLng = [telemetryData.latitude, telemetryData.longitude];
+            aircraftMarker.setLatLng(newLatLng);
+
+            // Takip modu aktifse haritayı uçağın konumuna odakla
+            if (isTracking) {
+                map.setView(newLatLng, map.getZoom(), {
+                    animate: true,
+                    duration: 0.5
+                });
+            }
+
+            // Uçak görselini yaw açısına göre döndür (img ile)
+            const rotation = Number(telemetryData.yaw.toFixed(2));
+            const rotatedIcon = L.divIcon({
+                html: `<img src="http://localhost:8000/enemy.png" style="width:30px;height:30px;transform:rotate(${rotation}deg);" />`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15],
+                className: ""
+            });
+            aircraftMarker.setIcon(rotatedIcon);
+
+            // --- Nokta markerlarını güncelle ---
+            // Önce eski markerları kaldır
+            positionMarkers.forEach(marker => map.removeLayer(marker));
+            positionMarkers = [];
+
+            // Python'dan gelen koordinatlar dizisini işle
+            if (Array.isArray(telemetryData.koordinatlar)) {
+                telemetryData.koordinatlar.forEach(coord => {
+                    if (coord && typeof coord.lat === "number" && typeof coord.lon === "number") {
+                        const marker = L.marker([coord.lat, coord.lon], {
+                            icon: L.divIcon({
+                                html: `<div style="width:12px;height:12px;background:red;border-radius:50%;border:2px solid white;"></div>`,
+                                iconSize: [12, 12],
+                                iconAnchor: [6, 6],
+                                className: ""
+                            })
+                        }).addTo(map);
+                        positionMarkers.push(marker);
+                    }
+                });
+            }
+
+            // --- Waypoint markerlarını güncelle ---
+            // Önce eski waypoint markerlarını kaldır
+            waypointMarkers.forEach(marker => map.removeLayer(marker));
+            waypointMarkers = [];
+            
+            // Eski çizgiyi kaldır
+            if (waypointLine) {
+                map.removeLayer(waypointLine);
+                waypointLine = null;
+            }
+
+            // Waypoints'leri işle
+            if (Array.isArray(telemetryData.waypoints)) {
+                const waypointCoords = [];
+                
+                telemetryData.waypoints.forEach((waypoint, index) => {
+                    if (waypoint && waypoint.length >= 2) {
+                        const lat = waypoint[0];
+                        const lon = waypoint[1];
+                        
+                        // Sıralı marker oluştur
+                        const marker = L.marker([lat, lon], {
+                            icon: L.divIcon({
+                                html: `<div style="width:24px;height:24px;background:#2196F3;border-radius:50%;border:2px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;">${index + 1}</div>`,
+                                iconSize: [24, 24],
+                                iconAnchor: [12, 12],
+                                className: ""
+                            })
+                        }).addTo(map);
+                        
+                        waypointMarkers.push(marker);
+                        waypointCoords.push([lat, lon]);
+                    }
+                });
+                
+                // Waypoint'leri çizgi ile bağla
+                if (waypointCoords.length > 1) {
+                    waypointLine = L.polyline(waypointCoords, {
+                        color: '#2196F3',
+                        weight: 3,
+                        opacity: 0.8,
+                        dashArray: '5, 5'
+                    }).addTo(map);
+                }
+            }
+        }
+    }
+
+    // Bağlantı durumunu güncelleme
+    function updateConnectionStatus(connected) {
+        const statusElement = document.getElementById('connection-status');
+        if (connected) {
+            statusElement.textContent = 'Mission Planner: BAĞLI';
+            statusElement.className = 'connection-status connected';
+        } else {
+            statusElement.textContent = 'Mission Planner: BAĞLANTI KESİK';
+            statusElement.className = 'connection-status';
+        }
+    }
+
+    // Konsol mesajı ekleme
+    function addConsoleMessage(message) {
+        const consolePanel = document.getElementById('console-panel');
+        const timestamp = new Date().toLocaleTimeString();
+        const messageDiv = document.createElement('div');
+        messageDiv.innerHTML = `<span style="color: #6B7280;">[${timestamp}]</span> ${message}`;
+        consolePanel.appendChild(messageDiv);
+        consolePanel.scrollTop = consolePanel.scrollHeight;
+    }
+
+    // Yeniden bağlanma zamanlaması
+    function scheduleReconnect() {
+        if (reconnectInterval) clearInterval(reconnectInterval);
+        reconnectInterval = setInterval(() => {
+            addConsoleMessage('Yeniden bağlanmaya çalışılıyor...');
+            connectToMissionPlanner();
+        }, 5000);
+    }
+
+    // Gauge animasyonu
+    function animateGauges() {
+        document.querySelectorAll('.gauge').forEach(gauge => {
+            gauge.classList.add('updating');
+            setTimeout(() => gauge.classList.remove('updating'), 300);
+        });
+    }
+
+    // Sayfa yüklendiğinde başlatma
+    window.addEventListener('load', function() {
+        initializeMap();
+        addConsoleMessage('Telemetri sistemi başlatıldı');
+        connectToMissionPlanner();
+        // setInterval(fetchTelemetryHTTP, 1000); // <-- Burası kaldırıldı
+        // Test verisi (geliştirme için)
+        // setInterval(() => {
+        //     const testData = {
+        //         airspeed: 20 + Math.random() * 10,
+        //         altitude: 100 + Math.random() * 50,
+        //         groundspeed: 22 + Math.random() * 8,
+        //         yaw: Math.random() * 360,
+        //         pitch: -5 + Math.random() * 10,
+        //         roll: -3 + Math.random() * 6,
+        //         signalQuality: Math.floor(Math.random() * 100),
+        //         battery: 75 + Math.random() * 25
+        //     };
+        //     updateTelemetryData(testData);
+        // }, 2000);
+    });
+</script>
+</body>
+</html>

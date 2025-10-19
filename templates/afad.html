@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFAD Arama Kurtarma Yönetim Paneli</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta8fBh2P+PtF6ovYdxcW2wNsBkjV8g0pBwIasSgK+bQ=" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* Genel Stil */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8f9fa;
+            color: #333;
+            line-height: 1.4;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .main-wrapper {
+            display: flex;
+            flex-grow: 1;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 480px;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+            order: 2;
+            display: flex;
+            flex-direction: column;
+            height: auto;
+        }
+        
+        .data-cards {
+            flex-grow: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 70px;
+        }
+
+        #mainMapContainer {
+            flex-grow: 1;
+            order: 1;
+            height: 300px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+            z-index: 1;
+            background-color: #e0e0e0;
+        }
+
+        #mainMap {
+            height: 100%;
+            width: 100%;
+            border-radius: 0px;
+        }
+
+        @media (min-width: 900px) {
+            body {
+                flex-direction: row;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .main-wrapper {
+                flex-direction: row;
+                height: 100%;
+            }
+            #mainMapContainer {
+                order: 1;
+                width: calc(100% - 480px);
+                height: 100vh;
+            }
+            .container {
+                order: 2;
+                max-width: 480px;
+                height: 100vh;
+                min-height: unset;
+                overflow-y: hidden;
+            }
+            .data-cards {
+                flex-grow: 1;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 20px;
+            }
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: linear-gradient(135deg, #fef2f2, #fecaca);
+            padding: 12px 20px;
+            border-bottom: 2px solid #dc2626;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+        }
+
+        .status-dot.connected {
+            background: #22c55e;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+        }
+
+        /* Data Cards */
+        .data-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #dc2626;
+            border: 2px solid #e5e7eb;
+            position: relative;
+            transition: all 0.3s ease;
+            margin-bottom: 12px;
+        }
+
+        .data-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        /* Öncelik Renkleri */
+        .data-card.priority-high {
+            border-left-color: #dc2626;
+            border-color: #fecaca;
+            background: linear-gradient(135deg, #fef2f2, #ffffff);
+        }
+
+        .data-card.priority-medium {
+            border-left-color: #f59e0b;
+            border-color: #fed7aa;
+            background: linear-gradient(135deg, #fffbeb, #ffffff);
+        }
+
+        .data-card.priority-low {
+            border-left-color: #10b981;
+            border-color: #a7f3d0;
+            background: linear-gradient(135deg, #f0fdf4, #ffffff);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-id {
+            font-weight: 700;
+            font-size: 18px;
+            color: #1f2937;
+        }
+
+        .priority-badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .priority-badge .ai-icon {
+            font-size: 14px;
+            opacity: 0.8;
+            color: white;
+        }
+
+        .priority-high { 
+            background: linear-gradient(135deg, #dc2626, #991b1b); 
+            color: white; 
+        }
+        .priority-medium { 
+            background: linear-gradient(135deg, #f59e0b, #d97706); 
+            color: white; 
+        }
+        .priority-low { 
+            background: linear-gradient(135deg, #10b981, #059669); 
+            color: white; 
+        }
+
+        .card-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            font-size: 15px;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .info-value.bold {
+            font-weight: 700;
+        }
+
+        .location-info {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            border: 2px solid #dc2626;
+        }
+
+        .location-info .info-value.clickable {
+            cursor: pointer;
+            text-decoration: underline;
+            color: #dc2626;
+            font-weight: 600;
+        }
+        .location-info .info-value.clickable:hover {
+            color: #991b1b;
+        }
+
+        .current-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.1));
+            padding: 16px;
+            border-radius: 12px;
+            border: 2px solid rgba(220, 38, 38, 0.2);
+        }
+
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.8);
+        }
+
+        .status-bekleniyor { 
+            background: #94a3b8;
+            box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
+        }
+        .status-mudahale { 
+            background: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .status-kurtarildi { 
+            background: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        .status-text {
+            font-weight: 700;
+            font-size: 16px;
+            color: #1f2937;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .status-bekleniyor + .status-text { color: #475569; }
+        .status-mudahale + .status-text { color: #1e40af; }
+        .status-kurtarildi + .status-text { color: #047857; }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-bekleniyor {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: white;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+        }
+
+        .btn-mudahale {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-kurtarildi {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(220, 38, 38, 0.4);
+            transition: all 0.3s ease;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 35px rgba(220, 38, 38, 0.5);
+        }
+
+        .refresh-btn.loading {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #9ca3af;
+            text-align: right;
+            margin-top: 12px;
+            font-weight: 500;
+        }
+
+        .notification {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1001;
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                max-width: 100%;
+            }
+            
+            .data-cards {
+                padding: 15px;
+            }
+        }
+
+        .data-card.removing {
+            animation: slideOut 0.5s ease-in-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes slideOut {
+            0% {
+                opacity: 1;
+                transform: translateX(0);
+                max-height: 500px;
+                margin-bottom: 15px;
+            }
+            50% {
+                opacity: 0.5;
+                transform: translateX(100%);
+                max-height: 500px;
+                margin-bottom: 15px;
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(100%);
+                max-height: 0;
+                margin-bottom: 0;
+                padding: 0;
+            }
+        }
+
+        .data-card.rescued {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-left-color: #10b981;
+            color: white;
+            animation: successPulse 0.3s ease-in-out;
+        }
+
+        .data-card.rescued .info-label,
+        .data-card.rescued .info-value,
+        .data-card.rescued .card-id,
+        .data-card.rescued .status-text {
+            color: white;
+        }
+
+        .data-card.rescued .priority-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        @keyframes successPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        /* Navbar for logged-in users */
+        .navbar {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.2);
+        }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .navbar a:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-1px);
+        }
+        .navbar .user-info {
+            font-weight: 600;
+        }
+        .navbar .user-info .role {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-left: 8px;
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        /* Flash Messages */
+        .flash-message {
+            padding: 16px 24px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 0px;
+            animation: slideIn 0.3s ease-out;
+        }
+        .flash-message.success {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            color: #166534;
+            border-bottom: 3px solid #10b981;
+        }
+        .flash-message.danger {
+            background: linear-gradient(135deg, #fef2f2, #fecaca);
+            color: #991b1b;
+            border-bottom: 3px solid #dc2626;
+        }
+        .flash-message.info {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: #1e40af;
+            border-bottom: 3px solid #3b82f6;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <div id="mainMapContainer">
+            <div id="mainMap"></div>
+        </div>
+
+        <div class="container">
+            <div class="navbar">
+                <div class="user-info">
+                    {% if current_user.is_authenticated %}
+                        Merhaba, {{ current_user.username }}! <span class="role">{% if current_user.role == 'admin' %}Yönetici{% else %}Görevli{% endif %}</span>
+                    {% else %}
+                        Misafir
+                    {% endif %}
+                </div>
+                <div>
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.role == 'admin' %}
+                            <a href="{{ url_for('admin_panel_page') }}">Admin Paneli</a>
+                        {% endif %}
+                        <a href="{{ url_for('logout') }}">Çıkış Yap</a>
+                    {% else %}
+                        <a href="{{ url_for('login_page') }}">Giriş Yap</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <ul class="list-none p-0 m-0">
+                    {% for category, message in messages %}
+                        <li class="flash-message {{ category }}">{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+
+            <div class="header">
+                <h1>🆘 AFAD Yönetim Paneli</h1>
+                <div class="subtitle">Arama Kurtarma Operasyonları</div>
+            </div>
+
+            <div class="status-bar">
+                <div class="connection-status">
+                    <div class="status-dot" id="connectionDot"></div>
+                    <span id="connectionText">Bağlantı kontrol ediliyor...</span>
+                </div>
+                <div id="lastUpdate">--:--</div>
+            </div>
+
+            <div class="data-cards" id="dataCards">
+            </div>
+
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <div style="font-size: 48px; margin-bottom: 20px;">📋</div>
+                <h3>Henüz aktif görev bulunmuyor</h3>
+                <p>Yeni yardım çağrıları bekleniyor...</p>
+            </div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" id="refreshBtn" onclick="fetchData()">
+        🔄
+    </button>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        let mockData = [];
+        let lastDataHash = '';
+
+        let isConnected = false;
+        let dataCards = document.getElementById('dataCards');
+        let emptyState = document.getElementById('emptyState');
+        let connectionDot = document.getElementById('connectionDot');
+        let connectionText = document.getElementById('connectionText');
+        let lastUpdate = document.getElementById('lastUpdate');
+        let refreshBtn = document.getElementById('refreshBtn');
+
+        let mainMap; // Ana harita objesi
+        let mainMapMarkers = L.featureGroup(); // Ana harita üzerindeki tüm markerlar için katman grubu
+
+        // Bağlantı durumunu güncelle
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            if (connected) {
+                connectionDot.classList.add('connected');
+                connectionText.textContent = 'Sistem bağlı';
+            } else {
+                connectionDot.classList.remove('connected');
+                connectionText.textContent = 'Bağlantı kesildi';
+            }
+        }
+
+        // Bildirim göster
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${isError ? 'error' : ''} show`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Durum çevirici
+        function getStatusText(durum) {
+            const statusMap = {
+                'bekleniyor': 'Bekliyor',
+                'mudahale': 'Müdahale Ediliyor',
+                'kurtarildi': 'Kurtarıldı'
+            };
+            return statusMap[durum] || durum;
+        }
+
+        // Öncelik çevirici
+        function getPriorityText(oncelik) {
+            const priorityMap = {
+                'high': 'Acil',
+                'medium': 'Orta',
+                'low': 'Düşük'
+            };
+            return priorityMap[oncelik] || oncelik;
+        }
+
+        // Zaman formatı
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString('tr-TR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+
+        // Tarih formatı
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('tr-TR', { 
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Durum güncelleme
+        async function updateStatus(id, newStatus) {
+            try {
+                showNotification('Durum güncelleniyor...');
+                
+                const response = await fetch('/api/durum-guncelle', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id: id,
+                        durum: newStatus
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    lastDataHash = calculateDataHash(result.data);
+                    mockData = result.data;
+                    
+                    if (newStatus === 'kurtarildi') {
+                        const cardElement = document.querySelector(`[data-id="${id}"]`);
+                        if (cardElement) {
+                            cardElement.classList.add('rescued');
+                            showNotification('✅ Kurtarma tamamlandı!');
+                            
+                            setTimeout(() => {
+                                cardElement.classList.add('removing');
+                                
+                                setTimeout(() => {
+                                    mockData = mockData.filter(item => item.id !== id);
+                                    renderData(); // Veri listesi ve haritayı yenile
+                                }, 500);
+                            }, 1500);
+                        }
+                    } else {
+                        renderData(); // Veri listesi ve haritayı yenile
+                        showNotification(result.message);
+                    }
+                    
+                } else {
+                    showNotification(result.message, true);
+                }
+                
+            } catch (error) {
+                showNotification('Durum güncellenirken hata oluştu: ' + error.message, true);
+            }
+        }
+
+        // Öncelik sıralaması için yardımcı fonksiyon
+        function getPriorityOrder(priority) {
+            const order = { 'high': 1, 'medium': 2, 'low': 3 };
+            return order[priority] || 4;
+        }
+
+        // Ana Harita Fonksiyonları
+        function initMainMap() {
+            if (mainMap) {
+                mainMap.remove(); // Önceki harita örneğini kaldır
+            }
+            // Bursa'nın merkez koordinatları
+            const defaultLat = 40.1885;
+            const defaultLng = 29.0609;
+            mainMap = L.map('mainMap').setView([defaultLat, defaultLng], 7); // Türkiye veya varsayılan bir merkeze odaklanma
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(mainMap);
+
+            mainMapMarkers.addTo(mainMap); // Marker grubunu haritaya ekle
+        }
+
+        function updateMainMapMarkers() {
+            mainMapMarkers.clearLayers(); // Tüm eski markerları temizle
+
+            if (!mockData || mockData.length === 0) {
+                return; // Veri yoksa marker ekleme
+            }
+
+            let bounds = L.latLngBounds([]); // Tüm markerları kapsayacak sınırlar için
+
+            mockData.forEach(item => { // Tüm aktif talepleri haritada göster
+                let markerColor;
+                // YENİ DÜZELTME: Renk mantığı - Öncelik rengi, durum rengini baskın kılacak
+                if (item.oncelik === 'high') {
+                    markerColor = '#dc2626'; // Kırmızı (Acil)
+                } else if (item.oncelik === 'medium') {
+                    markerColor = '#f59e0b'; // Turuncu (Orta)
+                } else if (item.oncelik === 'low') {
+                    markerColor = '#10b981'; // Yeşil (Düşük)
+                } else {
+                    markerColor = '#94a3b8'; // Varsayılan/Gri (Bekleniyor ile benzer)
+                }
+                
+                // Duruma göre renk üzerinde ufak bir oynama yapabiliriz (opsiyonel, şimdilik sadece ana öncelik rengi)
+                // Örneğin, müdahale ediliyor ise marker daha belirgin olabilir.
+                if (item.durum === 'mudahale') {
+                    // Müdahale ediliyor ise, öncelik rengini korurken kenarlığını veya ikonunu değiştirebiliriz.
+                    // Şimdilik sadece ana rengi öncelik belirlesin.
+                } else if (item.durum === 'kurtarildi') {
+                    markerColor = '#047857'; // Kurtarıldıysa koyu yeşil
+                }
+
+
+                const customIcon = L.divIcon({
+                    html: `<div style="background-color: ${markerColor}; width: 30px; height: 30px; border-radius: 50%; border: 4px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-location-dot" style="color:white; font-size:16px;"></i></div>`,
+                    iconSize: [30, 30],
+                    className: 'custom-map-marker',
+                    iconAnchor: [15, 30] 
+                });
+
+                const marker = L.marker([item.konum.lat, item.konum.lng], { icon: customIcon })
+                                .bindPopup(`
+                                    <b>ID: ${item.id}</b><br>
+                                    Adres: ${item.konum.adres}<br>
+                                    Durum: ${getStatusText(item.durum)}<br>
+                                    Öncelik: ${getPriorityText(item.oncelik)}<br>
+                                    <a href="https://www.google.com/maps/dir/?api=1&destination=${item.konum.lat},${item.konum.lng}" target="_blank">Yol Tarifi Al</a>
+                                `);
+                mainMapMarkers.addLayer(marker); // Markeri featureGroup'a ekle
+                bounds.extend([item.konum.lat, item.konum.lng]); // Sınırları güncelle
+            });
+
+            if (bounds.isValid()) { // Eğer haritada marker varsa, hepsini kapsayacak şekilde haritayı ayarla
+                mainMap.fitBounds(bounds.pad(0.1)); // %10 boşluk bırakarak fit et
+            } else { // Hiç marker yoksa Türkiye'ye odaklan
+                mainMap.setView([39.9334, 32.8597], 7);
+            }
+        }
+
+        // Konum bilgisine tıklandığında haritayı o konuma odakla
+        function focusMapOnLocation(lat, lng, id) {
+            if (mainMap) {
+                mainMap.flyTo([lat, lng], 15); // Belirli bir zoom seviyesine uç
+                // Tıklanan markerın pop-up'ını aç (opsiyonel, tüm markerlar zaten popup'lı)
+                mainMapMarkers.eachLayer(function(marker) {
+                    if (marker.getLatLng().lat.toFixed(6) == lat.toFixed(6) && marker.getLatLng().lng.toFixed(6) == lng.toFixed(6)) {
+                        marker.openPopup();
+                    } else {
+                        marker.closePopup(); // Diğer pop-upları kapat
+                    }
+                });
+            }
+        }
+
+        // Veri render
+        function renderData() {
+            if (!mockData || mockData.length === 0) {
+                dataCards.style.display = 'none';
+                emptyState.style.display = 'block';
+            } else {
+                dataCards.style.display = 'block';
+                emptyState.style.display = 'none';
+            }
+
+            const sortedData = [...mockData].sort((a, b) => {
+                const priorityA = getPriorityOrder(a.oncelik);
+                const priorityB = getPriorityOrder(b.oncelik);
+                
+                if (priorityA !== priorityB) {
+                    return priorityA - priorityB;
+                }
+                
+                return new Date(a.tarih) - new Date(b.tarih);
+            });
+
+            dataCards.innerHTML = sortedData.map(item => `
+                <div class="data-card priority-${item.oncelik}" data-id="${item.id}">
+                    <div class="card-header">
+                        <div class="card-id">${item.id}</div>
+                        <div class="priority-badge priority-${item.oncelik}">
+                            ${getPriorityText(item.oncelik)}
+                            <i class="fa-solid fa-robot ai-icon" title="Yapay Zeka tarafından önceliklendirildi"></i>
+                        </div>
+                    </div>
+
+                    <div class="location-info">
+                        <div class="info-label">📍 Konum</div>
+                        <div class="info-value clickable" onclick="focusMapOnLocation(${item.konum.lat}, ${item.konum.lng}, '${item.id}')">${item.konum.adres}</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
+                            ${item.konum.lat.toFixed(6)}, ${item.konum.lng.toFixed(6)}
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${item.konum.lat},${item.konum.lng}" target="_blank" class="text-blue-600 hover:underline ml-2">
+                                <i class="fa-solid fa-route"></i> Yol Tarifi
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card-info">
+                        <div class="info-item">
+                            <div class="info-label">⏰ Gelen Veri Tarihi</div>
+                            <div class="info-value">${formatDate(item.tarih)}</div>
+                        </div>
+                    </div>
+
+                    ${item.detay ? `
+                        <div class="info-item" style="margin-bottom: 15px;">
+                            <div class="info-label">ℹ️ Detay</div>
+                            <div class="info-value">${item.detay}</div>
+                        </div>
+                    ` : ''}
+
+                    <div class="current-status">
+                        <div class="status-indicator status-${item.durum}"></div>
+                        <div class="status-text">${getStatusText(item.durum)}</div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-bekleniyor" 
+                                onclick="updateStatus('${item.id}', 'bekleniyor')"
+                                ${item.durum === 'bekleniyor' ? 'disabled' : ''}>
+                            ⏳ Bekliyor
+                        </button>
+                        <button class="btn btn-mudahale" 
+                                onclick="updateStatus('${item.id}', 'mudahale')"
+                                ${item.durum === 'mudahale' ? 'disabled' : ''}>
+                            🚑 Müdahale
+                        </button>
+                        <button class="btn btn-kurtarildi" 
+                                onclick="updateStatus('${item.id}', 'kurtarildi')"
+                                ${item.durum === 'kurtarildi' ? 'disabled' : ''}>
+                            ✅ Kurtarıldı
+                        </button>
+                    </div>
+                    
+                    <div class="timestamp">
+                        Son güncelleme: ${formatTime(item.tarih)}
+                    </div>
+                </div>
+            `).join('');
+
+            // Ana haritayı taleplerle güncelle
+            updateMainMapMarkers();
+
+            lastUpdate.textContent = new Date().toLocaleTimeString('tr-TR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function calculateDataHash(data) {
+            return JSON.stringify(data.map(item => item.id).sort());
+        }
+
+        async function fetchData() {
+            refreshBtn.classList.add('loading');
+            
+            try {
+                const response = await fetch('/api/veriler');
+                if (response.status === 401) { 
+                    window.location.href = '/login.html'; 
+                    return;
+                }
+                const data = await response.json();
+                
+                const newDataHash = calculateDataHash(data);
+                
+                if (lastDataHash && lastDataHash !== newDataHash) {
+                    const oldIds = JSON.parse(lastDataHash);
+                    const newIds = JSON.parse(newDataHash);
+                    if (newIds.length > oldIds.length) {
+                        showNotification('🔔 Yeni arama kurtarma ilanı geldi!');
+                    }
+                }
+                
+                lastDataHash = newDataHash;
+                mockData = data;
+                
+                updateConnectionStatus(true);
+                renderData(); // Hem kartları hem haritayı güncelleyecek
+                
+            } catch (error) {
+                console.error('Veri çekilirken hata:', error);
+                updateConnectionStatus(false);
+                showNotification('Veri çekilirken hata oluştu: ' + error.message, true);
+            } finally {
+                refreshBtn.classList.remove('loading');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initMainMap(); // Sayfa yüklenince ana haritayı başlat
+            fetchData();
+            
+            setInterval(fetchData, 3000);
+        });
+
+        window.addEventListener('online', () => {
+            updateConnectionStatus(true);
+            fetchData();
+        });
+
+        window.addEventListener('offline', () => {
+            updateConnectionStatus(false);
+        });
+        
+        // Window resize olduğunda haritanın boyutunu güncelle
+        window.addEventListener('resize', function() {
+            if (mainMap) {
+                mainMap.invalidateSize();
+            }
+        });
+    </script>
+</body>
+</html>
