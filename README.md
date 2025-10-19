@@ -46,36 +46,6 @@
 
 ---
 
-## 📸 Ekran Görüntüleri
-
-<div align="center">
-
-### Depremzede Yardım Çağırma Sayfası
-![Depremzede Arayüzü](assets/depremzede_screenshot.png)
-*Depremzedeler WiFi'ye bağlanıp haritadan konumlarını işaretler ve yardım çağırır*
-
----
-
-### AFAD Yönetim Paneli
-![AFAD Panel](assets/afad_panel_screenshot.png)
-*AFAD görevlileri tüm talepleri haritada görür, öncelik sırasına göre müdahale eder*
-
----
-
-### Admin Paneli
-![Admin Panel](assets/admin_paneli.jpeg)
-*Kullanıcı yönetimi, sistem istatistikleri ve rol atama*
-
----
-
-### Yer Kontrol İstasyonu
-![Yer Kontrol](assets/yer_kontrol_screenshot.png)
-*Drone telemetrisi: GPS, hız, batarya, yükseklik, rota takibi*
-
-</div>
-
-> 📁 **Not**: Ekran görüntülerini `assets/` klasörüne ekleyebilirsiniz.
-
 ---
 
 ## 🏗️ Sistem Mimarisi
